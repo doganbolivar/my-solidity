@@ -1,0 +1,57 @@
+pragma solidity ^0.8.0;
+
+//build a merkle tree from a list of items
+//each item is a 32 byte hash
+contract MerkleTree {
+    struct Node {
+        bytes32 hash;
+        uint8[2] left;
+        uint8[2] right;
+    }
+
+    Node[] nodes;
+    uint8[2] root;
+
+    function MerkleTree(bytes32[] _hashes) public {
+        uint256 count = _hashes.length;
+        if (count == 0) {
+            root = uint8[2](0, 0);
+            return;
+        }
+        //compute how many levels of the tree we need
+        uint8 depth = 0;
+        while (count > 1) {
+            count = uint256(count) >> 1;
+            depth++;
+        }
+        //allocate memory for all the nodes
+        nodes = new Node[](uint256(1) << depth);
+        //now compute the tree
+        uint256 nodeIndex = 0;
+        for (uint8 level = 0; level < depth; level++) {
+            uint256 start = uint256(1) << level;
+            uint256 end = uint256(1) << (level + 1);
+            for (uint256 i = start; i < end; i++) {
+                //compute the hash of the two child nodes
+                uint8[2] left = nodes[nodeIndex].left;
+                uint8[2] right = nodes[nodeIndex].right;
+                if (left[1] == 0 && right[1] == 0) {
+                    //this is a leaf node, store the hash
+                    nodes[nodeIndex].hash = _hashes[left[0]];
+                } else {
+                    //this is an internal node, compute the hash
+                    bytes32 leftHash = nodes[left[0]].hash;
+                    bytes32 rightHash = nodes[right[0]].hash;
+                    nodes[nodeIndex].hash = sha3(bytes(leftHash) + bytes(rightHash));
+                }
+                nodeIndex++;
+            }
+        }
+        root = nodes[nodeIndex - 1].hash;
+    }
+
+    function root() public view returns (uint8[2]) {
+        return root;
+    }
+
+    function proof(uint256 _index) public view returns
